@@ -1,0 +1,13 @@
+{
+  "keywords": [
+    "violent",
+    "gore",
+    "blood",
+    "graphic",
+    "nsfw",
+    "inappropriate"
+  ],
+  "channels": [],
+  "categories": [],
+  "notes": "Add keywords, channel IDs, or category IDs to flag content. This list will be checked against video metadata."
+}

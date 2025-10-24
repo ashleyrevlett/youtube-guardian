@@ -1,0 +1,19 @@
+{
+  "name": "youtube-guardian",
+  "version": "0.0.1",
+  "type": "module",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "parse": "node parse-video-ids.js",
+    "analyze": "node analyze.js"
+  },
+  "author": "",
+  "license": "ISC",
+  "description": "",
+  "dependencies": {
+    "dotenv": "^17.2.3",
+    "google-auth-library": "^10.4.2",
+    "googleapis": "^164.1.0"
+  }
+}

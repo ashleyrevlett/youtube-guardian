@@ -1,0 +1,6 @@
+node_modules
+.env
+service-account-key.json
+oauth2.keys.json
+data/
+.DS_Store
