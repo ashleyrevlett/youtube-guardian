@@ -5,7 +5,8 @@
       "mcp__deepwiki__ask_question",
       "Bash(node:*)",
       "Bash(npm run analyze:*)",
-      "Bash(npm run parse:*)"
+      "Bash(npm run parse:*)",
+      "Bash(find:*)"
     ],
     "deny": [],
     "ask": []
