@@ -74,6 +74,7 @@ function processVideoData(video) {
     commentCount: parseInt(statistics.commentCount || 0),
     privacyStatus: status.privacyStatus,
     madeForKids: status.madeForKids,
+    selfDeclaredMadeForKids: status.selfDeclaredMadeForKids,
     embeddable: status.embeddable,
   };
 }

@@ -37,6 +37,7 @@ export const videos = sqliteTable('videos', {
   // Status
   privacyStatus: text('privacy_status'),
   madeForKids: integer('made_for_kids', {mode: 'boolean'}),
+  selfDeclaredMadeForKids: integer('self_declared_made_for_kids', {mode: 'boolean'}),
   embeddable: integer('embeddable', {mode: 'boolean'}),
 
   // Metadata

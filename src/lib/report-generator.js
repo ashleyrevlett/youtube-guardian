@@ -1,6 +1,6 @@
 import fs from 'fs';
 import {CATEGORY_NAMES} from './content-classifier.js';
-import {db, videos, classifications} from '../db/index.js';
+import {db, videos, classifications, classificationFlags} from '../db/index.js';
 import {sql, eq} from 'drizzle-orm';
 
 const c = {
@@ -74,6 +74,32 @@ async function generateConcerningContent() {
     console.log(`   Channel: ${c.cyan}${result.channelTitle}${c.reset} | Category: ${CATEGORY_NAMES[result.categoryId] || 'Unknown'}`);
     console.log(`   Video ID: ${result.videoId}`);
     console.log(`   Duration: ${formatDuration(result.duration)} | Views: ${formatNumber(result.viewCount)}`);
+
+    // Fetch and display classification flags for this video
+    const flags = await db
+      .select()
+      .from(classificationFlags)
+      .where(eq(classificationFlags.videoId, result.videoId));
+
+    if (flags.length > 0) {
+      const highFlags = flags.filter(f => f.flagType === 'flags');
+      const warnings = flags.filter(f => f.flagType === 'warnings');
+
+      if (highFlags.length > 0) {
+        console.log(`   ${c.red}⚠️  Flags:${c.reset}`);
+        highFlags.forEach(f => {
+          console.log(`      • ${f.message}`);
+        });
+      }
+
+      if (warnings.length > 0) {
+        console.log(`   ${c.yellow}⚠️  Warnings:${c.reset}`);
+        warnings.forEach(f => {
+          console.log(`      • ${f.message}`);
+        });
+      }
+    }
+
     console.log();
   }
 

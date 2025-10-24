@@ -2,6 +2,7 @@ import fs from 'fs';
 import path from 'path';
 import {fileURLToPath} from 'url';
 import {db, videos, classifications, classificationFlags} from '../db/index.js';
+import {parseContentRating, getMostRestrictiveRating, getFlagSeverity, formatRating} from './rating-parser.js';
 
 const PROJECT_ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 
@@ -61,11 +62,38 @@ function classifyVideo(video, blocklist, channelProfile) {
     flags.push({flagType: 'flags', type: 'BLOCKLIST_CATEGORY', severity: 'HIGH', message: `Category "${CATEGORY_NAMES[video.categoryId] || video.categoryId}" is blocked`});
   }
 
-  // Check age restrictions
-  if (video.contentRating && Object.keys(video.contentRating).length > 0) {
-    warnings.push({flagType: 'warnings', type: 'AGE_RESTRICTED', severity: 'HIGH', message: `Age restricted: ${JSON.stringify(video.contentRating)}`});
+  // Parse content ratings (MPAA, BBFC)
+  const parsedRatings = parseContentRating(video.contentRating);
+
+  if (parsedRatings.length > 0) {
+    const mostRestrictive = getMostRestrictiveRating(parsedRatings);
+
+    // Generate flags based on rating severity
+    for (const rating of parsedRatings) {
+      const flagSeverity = getFlagSeverity(rating.severity);
+      const message = formatRating(rating);
+
+      if (rating.severity === 'ADULT' || rating.severity === 'MATURE') {
+        flags.push({flagType: 'flags', type: 'AGE_RATING_MATURE', severity: flagSeverity, message});
+      } else if (rating.severity === 'TEEN') {
+        warnings.push({flagType: 'warnings', type: 'AGE_RATING_TEEN', severity: flagSeverity, message});
+      } else if (rating.severity === 'GUIDANCE') {
+        info.push({flagType: 'info', type: 'AGE_RATING_GUIDANCE', severity: flagSeverity, message});
+      }
+    }
   }
 
+  // Check for madeForKids mismatch
+  if (video.madeForKids !== undefined && video.selfDeclaredMadeForKids !== undefined) {
+    if (video.madeForKids !== video.selfDeclaredMadeForKids) {
+      const mismatchMsg = video.selfDeclaredMadeForKids === false
+        ? 'Creator declared NOT for kids, but YouTube determined it IS for kids'
+        : 'Creator declared for kids, but YouTube determined it is NOT for kids';
+      info.push({flagType: 'info', type: 'MADE_FOR_KIDS_MISMATCH', severity: 'LOW', message: mismatchMsg});
+    }
+  }
+
+  // Flag content not made for kids
   if (video.madeForKids === false) {
     info.push({flagType: 'info', type: 'NOT_FOR_KIDS', severity: 'LOW', message: 'Not marked for kids'});
   }
