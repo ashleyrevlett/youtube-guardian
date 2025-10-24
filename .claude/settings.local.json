@@ -3,7 +3,8 @@
     "allow": [
       "mcp__deepwiki__read_wiki_structure",
       "mcp__deepwiki__ask_question",
-      "Bash(node:*)"
+      "Bash(node:*)",
+      "Bash(npm run analyze:*)"
     ],
     "deny": [],
     "ask": []

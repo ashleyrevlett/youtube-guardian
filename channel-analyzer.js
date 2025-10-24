@@ -18,6 +18,9 @@ function buildChannelProfiles(videoDetails, watchHistory) {
   // Create a map of video IDs to watch times
   const watchTimes = {};
   for (const entry of watchHistory) {
+    // Skip entries without titleUrl
+    if (!entry.titleUrl) continue;
+
     const videoIdMatch = entry.titleUrl.match(/watch\?v=([a-zA-Z0-9_-]+)/);
     if (videoIdMatch) {
       watchTimes[videoIdMatch[1]] = entry.time;
