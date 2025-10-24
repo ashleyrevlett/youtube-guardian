@@ -127,23 +127,6 @@ The architecture supports adding:
 - 🌐 **Web Dashboard** - Interactive monitoring interface
 - 📧 **Email Alerts** - Automated notifications for concerning content
 
-## Architecture
-
-```
-youtube-guardian/
-├── parse-video-ids.js      # Parse watch history
-├── analyze.js              # Main analysis orchestrator
-├── video-analyzer.js       # YouTube API integration
-├── channel-analyzer.js     # Channel profiling
-├── content-classifier.js   # Content classification
-├── report-generator.js     # Terminal report generation
-├── config/
-│   └── blocklist.json     # Customizable content filters
-├── data/
-│   ├── watch-history.json # Input: YouTube history export
-│   └── *.json            # Generated analysis data
-└── classifiers/           # Future: ML classifiers
-```
 
 ## Notes
 
@@ -151,7 +134,3 @@ youtube-guardian/
 - **Service account authentication** is used for server-to-server communication
 - All data is stored **locally** - nothing is sent to external services
 - The YouTube Data API has **quota limits** - caching helps manage this
-
-## License
-
-ISC
