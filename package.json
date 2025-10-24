@@ -7,6 +7,8 @@
     "test": "echo \"Error: no test specified\" && exit 1",
     "parse": "node src/cli/parse-video-ids.js",
     "analyze": "node src/cli/analyze.js",
+    "download": "node src/cli/download-videos.js",
+    "cleanup-videos": "node src/cli/cleanup-videos.js",
     "start": "npm run db:push && npm run parse && npm run analyze",
     "db:generate": "drizzle-kit generate",
     "db:push": "drizzle-kit push"
