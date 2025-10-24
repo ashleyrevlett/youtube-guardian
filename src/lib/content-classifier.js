@@ -5,6 +5,9 @@ import {fileURLToPath} from 'url';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
+// Project root is two levels up from src/lib/
+const PROJECT_ROOT = path.join(__dirname, '..', '..');
+
 // YouTube category ID mappings
 const CATEGORY_NAMES = {
   '1': 'Film & Animation',
@@ -45,7 +48,7 @@ const CATEGORY_NAMES = {
  * Load blocklist configuration
  */
 function loadBlocklist() {
-  const blocklistPath = path.join(__dirname, 'config', 'blocklist.json');
+  const blocklistPath = path.join(PROJECT_ROOT, 'config', 'blocklist.json');
 
   if (!fs.existsSync(blocklistPath)) {
     console.warn('⚠️  Blocklist not found, creating default...');

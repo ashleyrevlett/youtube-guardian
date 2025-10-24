@@ -7,8 +7,11 @@ import {fileURLToPath} from 'url';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
+// Project root is two levels up from src/lib/
+const PROJECT_ROOT = path.join(__dirname, '..', '..');
+
 // Load service account key file path from .env
-const SERVICE_ACCOUNT_KEY_FILE = process.env.SERVICE_ACCOUNT_KEY_FILE || path.join(__dirname, 'service-account-key.json');
+const SERVICE_ACCOUNT_KEY_FILE = process.env.SERVICE_ACCOUNT_KEY_FILE || path.join(PROJECT_ROOT, 'service-account-key.json');
 
 /**
  * Authenticate using a service account

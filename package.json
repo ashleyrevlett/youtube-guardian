@@ -5,8 +5,8 @@
   "main": "index.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
-    "parse": "node parse-video-ids.js",
-    "analyze": "node analyze.js"
+    "parse": "node src/cli/parse-video-ids.js",
+    "analyze": "node src/cli/analyze.js"
   },
   "author": "",
   "license": "ISC",

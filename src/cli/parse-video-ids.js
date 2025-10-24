@@ -5,6 +5,9 @@ import {fileURLToPath} from 'url';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
+// Project root is two levels up from src/cli/
+const PROJECT_ROOT = path.join(__dirname, '..', '..');
+
 /**
  * Parse video IDs from YouTube watch history JSON
  * Filters out ads and non-video entries (like playables/games)
@@ -60,7 +63,7 @@ function parseVideoIds(watchHistoryPath) {
 }
 
 // Parse the watch history
-const watchHistoryPath = path.join(__dirname, 'data', 'watch-history.json');
+const watchHistoryPath = path.join(PROJECT_ROOT, 'data', 'watch-history.json');
 const {videoIds, stats} = parseVideoIds(watchHistoryPath);
 
 // Display statistics
@@ -82,7 +85,7 @@ videoIds.slice(0, 10).forEach((video, index) => {
 });
 
 // Save video IDs to a separate file
-const outputPath = path.join(__dirname, 'data', 'video-ids.json');
+const outputPath = path.join(PROJECT_ROOT, 'data', 'video-ids.json');
 fs.writeFileSync(outputPath, JSON.stringify(videoIds, null, 2));
 console.log(`Full video list saved to: ${outputPath}`);
 

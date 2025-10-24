@@ -11,16 +11,19 @@
 import 'dotenv/config';
 import path from 'path';
 import {fileURLToPath} from 'url';
-import {analyzeVideos} from './video-analyzer.js';
-import {analyzeChannels} from './channel-analyzer.js';
-import {classifyAllVideos} from './content-classifier.js';
-import {generateReport} from './report-generator.js';
+import {analyzeVideos} from '../lib/video-analyzer.js';
+import {analyzeChannels} from '../lib/channel-analyzer.js';
+import {classifyAllVideos} from '../lib/content-classifier.js';
+import {generateReport} from '../lib/report-generator.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
+// Project root is two levels up from src/cli/
+const PROJECT_ROOT = path.join(__dirname, '..', '..');
+
 // File paths
-const DATA_DIR = path.join(__dirname, 'data');
+const DATA_DIR = path.join(PROJECT_ROOT, 'data');
 const VIDEO_IDS_PATH = path.join(DATA_DIR, 'video-ids.json');
 const WATCH_HISTORY_PATH = path.join(DATA_DIR, 'watch-history.json');
 const VIDEO_DETAILS_PATH = path.join(DATA_DIR, 'video-details.json');
