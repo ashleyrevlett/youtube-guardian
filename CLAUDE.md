@@ -218,15 +218,17 @@ The `classifiers/` directory is prepared for plugin-based classifier architectur
 ## Commands
 
 ```bash
-# Parse watch history into database (filters ads/games)
-npm run parse
+# First-time setup (or after pulling new migrations)
+npm start                 # Runs db:push → parse → analyze
 
-# Run full analysis (fetch API data, classify, report)
-npm run analyze
+# Individual commands
+npm run parse             # Parse watch history into database (filters ads/games)
+npm run analyze           # Run full analysis (fetch API data, classify, report)
 
-# Database operations with Drizzle Kit (optional)
-npx drizzle-kit studio    # Visual database browser
-npx drizzle-kit push      # Apply schema changes
+# Database operations
+npm run db:push           # Apply migrations to database
+npm run db:generate       # (Developers only) Generate new migration after schema changes
+npx drizzle-kit studio    # Visual database browser (optional)
 ```
 
 ## Important Notes
@@ -253,6 +255,11 @@ npx drizzle-kit push      # Apply schema changes
    - Efficient querying with SQL joins and aggregations
    - Foundation for time-series analysis and trend tracking
    - WAL mode for better concurrency
+
+7. **Schema changes** (for developers):
+   - After modifying `src/db/schema.js`, run `npm run db:generate` to create new migration files
+   - Commit the generated migration files to the repo
+   - Users will automatically get schema updates when they run `npm start` (which includes `db:push`)
 
 ## Testing Status
 

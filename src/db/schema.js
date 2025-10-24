@@ -1,6 +1,8 @@
 import {sqliteTable, text, integer, real} from 'drizzle-orm/sqlite-core';
 import {sql} from 'drizzle-orm';
 
+// IMPORTANT: After modifying this schema, run `npm run db:generate` to create a new migration file
+
 // Watch history entries parsed from Google Takeout
 export const watchHistory = sqliteTable('watch_history', {
   id: integer('id').primaryKey({autoIncrement: true}),

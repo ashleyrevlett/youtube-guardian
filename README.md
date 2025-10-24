@@ -9,7 +9,8 @@ A parental monitoring system for analyzing YouTube watch history and detecting p
 - 📺 **Channel Profiling** - Track viewing patterns by channel
 - ⚠️ **Risk Assessment** - Categorize content as HIGH, MEDIUM, or LOW risk
 - 📋 **Terminal Reports** - Color-coded, easy-to-read monitoring reports
-- 💾 **Smart Caching** - Minimize API usage with intelligent caching
+- 💾 **Smart Caching** - SQLite database with intelligent caching to minimize API usage
+- 🗄️ **Database Storage** - Drizzle ORM with SQLite for efficient data management
 
 ## Prerequisites
 
@@ -48,33 +49,56 @@ config/blocklist.json
 
 ## Usage
 
-### Step 0: Setup
+### Quick Start (One Command)
+Run everything in one shot:
 ```bash
-nvm use
-npm run db:generate
-npm run db:push
-```
-
-
-### Step 1: Parse Watch History
-Extract video IDs from your watch history and filter out ads:
-```bash
-npm run parse
-```
-
-This creates `data/video-ids.json` with clean video data.
-
-### Step 2: Analyze Content
-Fetch video details from YouTube and generate a monitoring report:
-```bash
-npm run analyze
+npm start
 ```
 
 This will:
-1. Fetch video metadata from YouTube API (with caching)
-2. Analyze channel profiles and viewing patterns
-3. Classify content based on your blocklist
-4. Generate a color-coded terminal report and export findings to `data/analysis-results.json`
+1. Apply database migrations (`db:push`)
+2. Parse watch history into database (`parse`)
+3. Run full analysis and generate report (`analyze`)
+
+### Individual Commands
+
+If you prefer to run steps separately:
+
+**Parse Watch History**
+```bash
+npm run parse
+```
+Extracts video IDs from your watch history, filters out ads and games, and stores them in the SQLite database.
+
+**Analyze Content**
+```bash
+npm run analyze
+```
+1. Fetches video metadata from YouTube API (with smart caching in database)
+2. Analyzes channel profiles and viewing patterns
+3. Classifies content based on your blocklist
+4. Generates a color-coded terminal report
+5. Exports findings to `data/analysis-results.json`
+
+### Database Operations
+
+**Browse Database (Web UI)**
+```bash
+npx drizzle-kit studio
+```
+Opens a web interface to explore your SQLite database tables and data.
+
+**Apply Migrations**
+```bash
+npm run db:push
+```
+Applies database schema migrations (automatically run by `npm start`).
+
+**Generate Migrations (Developers Only)**
+```bash
+npm run db:generate
+```
+After modifying `src/db/schema.js`, run this to create new migration files.
 
 ## Configuration
 
@@ -131,10 +155,11 @@ The architecture supports adding:
 
 ## Notes
 
-- The system uses **smart caching** to minimize YouTube API quota usage
+- The system uses **SQLite database** with smart caching to minimize YouTube API quota usage
 - **Service account authentication** is used for server-to-server communication
-- All data is stored **locally** - nothing is sent to external services
-- The YouTube Data API has **quota limits** - caching helps manage this
+- All data is stored **locally** in `data/guardian.db` - nothing is sent to external services
+- The YouTube Data API has **quota limits** (10,000 units/day) - database caching helps manage this
+- Database is excluded from git via `.gitignore` - each user maintains their own local database
 
 ## Todo
 
