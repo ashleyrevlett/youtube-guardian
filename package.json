@@ -6,14 +6,21 @@
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
     "parse": "node src/cli/parse-video-ids.js",
-    "analyze": "node src/cli/analyze.js"
+    "analyze": "node src/cli/analyze.js",
+    "db:generate": "drizzle-kit generate",
+    "db:push": "drizzle-kit push"
   },
   "author": "",
   "license": "ISC",
   "description": "",
   "dependencies": {
+    "better-sqlite3": "^12.4.1",
     "dotenv": "^17.2.3",
+    "drizzle-orm": "^0.44.7",
     "google-auth-library": "^10.4.2",
     "googleapis": "^164.1.0"
+  },
+  "devDependencies": {
+    "drizzle-kit": "^0.31.5"
   }
 }

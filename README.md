@@ -48,6 +48,14 @@ config/blocklist.json
 
 ## Usage
 
+### Step 0: Setup
+```bash
+nvm use
+npm run db:generate
+npm run db:push
+```
+
+
 ### Step 1: Parse Watch History
 Extract video IDs from your watch history and filter out ads:
 ```bash
@@ -66,7 +74,7 @@ This will:
 1. Fetch video metadata from YouTube API (with caching)
 2. Analyze channel profiles and viewing patterns
 3. Classify content based on your blocklist
-4. Generate a color-coded terminal report
+4. Generate a color-coded terminal report and export findings to `data/analysis-results.json`
 
 ## Configuration
 
@@ -99,13 +107,6 @@ Common categories:
 - `27` - Education
 - `39` - Horror
 
-## Output Files
-
-- `data/video-ids.json` - Parsed video IDs from watch history
-- `data/video-details.json` - Full video metadata cache
-- `data/channel-profiles.json` - Channel analysis and statistics
-- `data/channel-cache.json` - Channel information cache
-- `data/analysis-results.json` - Complete analysis report (JSON)
 
 ## Report Sections
 

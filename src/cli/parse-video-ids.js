@@ -1,6 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 import {fileURLToPath} from 'url';
+import {db, watchHistory} from '../db/index.js';
 
 const PROJECT_ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 
@@ -27,10 +28,9 @@ function parseVideoIds(watchHistoryPath) {
     if (match) {
       videoIds.push({
         videoId: match[1],
+        watchedAt: entry.time,
         title: entry.title.replace('Watched ', ''),
         channel: entry.subtitles?.[0]?.name || 'Unknown',
-        time: entry.time,
-        url: entry.titleUrl
       });
       stats.videos++;
     } else {
@@ -48,12 +48,16 @@ const {videoIds, stats} = parseVideoIds(watchHistoryPath);
 console.log('=== Watch History Statistics ===');
 console.log(`Total: ${stats.total} | Videos: ${stats.videos} | Ads: ${stats.ads} | Games: ${stats.playables} | Other: ${stats.other}\n`);
 
+// Clear existing watch history
+await db.delete(watchHistory);
+
+// Insert all watch history entries into database
+await db.insert(watchHistory).values(videoIds);
+
+console.log(`✓ Inserted ${videoIds.length} videos into database\n`);
+
 console.log('=== First 10 Videos ===');
 videoIds.slice(0, 10).forEach((v, i) => {
   console.log(`${i + 1}. ${v.videoId} - ${v.title}`);
-  console.log(`   ${v.channel} | ${v.time}\n`);
+  console.log(`   ${v.channel} | ${v.watchedAt}\n`);
 });
-
-const outputPath = path.join(PROJECT_ROOT, 'data', 'video-ids.json');
-fs.writeFileSync(outputPath, JSON.stringify(videoIds, null, 2));
-console.log(`Saved ${videoIds.length} videos to: ${outputPath}`);

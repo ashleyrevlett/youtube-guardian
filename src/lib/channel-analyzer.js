@@ -1,151 +1,92 @@
-import fs from 'fs';
-import path from 'path';
-import {fileURLToPath} from 'url';
+import {db, videos, channels, watchHistory} from '../db/index.js';
 import {fetchChannelInfo} from './video-analyzer.js';
+import {sql, count, avg, min, max, desc} from 'drizzle-orm';
 
-const PROJECT_ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
-
-function getWatchTimes(watchHistory) {
-  const watchTimes = {};
-  for (const entry of watchHistory) {
-    if (!entry.titleUrl) continue;
-    const match = entry.titleUrl.match(/watch\?v=([a-zA-Z0-9_-]+)/);
-    if (match) watchTimes[match[1]] = entry.time;
-  }
-  return watchTimes;
-}
-
-function getTopItems(obj, limit) {
-  return Object.entries(obj)
-    .sort((a, b) => b[1] - a[1])
-    .slice(0, limit)
-    .map(([key, count]) => ({[Object.keys(obj)[0] === key ? 'categoryId' : 'tag']: key, count}));
-}
-
-function buildChannelProfiles(videoDetails, watchHistory) {
-  const profiles = {};
-  const watchTimes = getWatchTimes(watchHistory);
-
-  for (const [videoId, video] of Object.entries(videoDetails)) {
-    const {channelId, channelTitle, categoryId, tags, viewCount, likeCount, madeForKids, contentRating} = video;
-
-    if (!profiles[channelId]) {
-      profiles[channelId] = {
-        channelId,
-        channelTitle,
-        videosWatched: 0,
-        totalViews: 0,
-        totalLikes: 0,
-        categories: {},
-        tags: {},
-        madeForKidsCount: 0,
-        hasAgeRestriction: false,
-        firstWatched: null,
-        lastWatched: null,
-        videos: []
-      };
-    }
-
-    const profile = profiles[channelId];
-    profile.videosWatched++;
-    profile.totalViews += viewCount;
-    profile.totalLikes += likeCount;
-
-    if (categoryId) profile.categories[categoryId] = (profile.categories[categoryId] || 0) + 1;
-    tags.forEach(tag => profile.tags[tag] = (profile.tags[tag] || 0) + 1);
-    if (madeForKids) profile.madeForKidsCount++;
-    if (contentRating && Object.keys(contentRating).length > 0) profile.hasAgeRestriction = true;
-
-    const watchTime = watchTimes[videoId];
-    if (watchTime) {
-      if (!profile.firstWatched || watchTime < profile.firstWatched) profile.firstWatched = watchTime;
-      if (!profile.lastWatched || watchTime > profile.lastWatched) profile.lastWatched = watchTime;
-    }
-
-    profile.videos.push({videoId, title: video.title, watchedAt: watchTime});
-  }
-
-  // Calculate stats
-  for (const profile of Object.values(profiles)) {
-    profile.avgViewCount = Math.round(profile.totalViews / profile.videosWatched);
-    profile.avgLikeCount = Math.round(profile.totalLikes / profile.videosWatched);
-    profile.madeForKidsRatio = profile.madeForKidsCount / profile.videosWatched;
-    profile.topCategories = Object.entries(profile.categories)
-      .sort((a, b) => b[1] - a[1])
-      .slice(0, 3)
-      .map(([categoryId, count]) => ({categoryId, count}));
-    profile.topTags = Object.entries(profile.tags)
-      .sort((a, b) => b[1] - a[1])
-      .slice(0, 10)
-      .map(([tag, count]) => ({tag, count}));
-    profile.videos.sort((a, b) => new Date(b.watchedAt) - new Date(a.watchedAt));
-  }
-
-  return profiles;
-}
-
-async function enrichChannelProfiles(profiles, cachePath) {
-  console.log('\n📡 Fetching channel information...');
-
-  const cache = fs.existsSync(cachePath) ? JSON.parse(fs.readFileSync(cachePath, 'utf-8')) : {};
-  let fetched = 0;
-
-  for (const [channelId, profile] of Object.entries(profiles)) {
-    if (cache[channelId]) {
-      profile.channelInfo = cache[channelId];
-      continue;
-    }
-
-    console.log(`  Fetching channel: ${profile.channelTitle}...`);
-    const channelInfo = await fetchChannelInfo(channelId);
-
-    if (channelInfo) {
-      const enrichedInfo = {
-        subscriberCount: parseInt(channelInfo.statistics?.subscriberCount || 0),
-        videoCount: parseInt(channelInfo.statistics?.videoCount || 0),
-        viewCount: parseInt(channelInfo.statistics?.viewCount || 0),
-        description: channelInfo.snippet?.description || '',
-        publishedAt: channelInfo.snippet?.publishedAt,
-        thumbnails: channelInfo.snippet?.thumbnails,
-        fetchedAt: new Date().toISOString()
-      };
-
-      profile.channelInfo = enrichedInfo;
-      cache[channelId] = enrichedInfo;
-      fetched++;
-
-      await new Promise(resolve => setTimeout(resolve, 1000));
-    }
-  }
-
-  if (fetched > 0) {
-    fs.writeFileSync(cachePath, JSON.stringify(cache, null, 2));
-    console.log(`✓ Fetched ${fetched} new channel details\n`);
-  }
-
-  return profiles;
-}
-
-async function analyzeChannels(videoDetailsPath, watchHistoryPath, outputPath, cachePath) {
+async function analyzeChannels() {
   console.log('📊 Channel Profiler');
   console.log('==================\n');
 
-  const videoDetails = JSON.parse(fs.readFileSync(videoDetailsPath, 'utf-8'));
-  const watchHistory = JSON.parse(fs.readFileSync(watchHistoryPath, 'utf-8'));
+  // Build channel statistics from database using SQL aggregation
+  const channelStats = await db
+    .select({
+      channelId: videos.channelId,
+      channelTitle: videos.channelTitle,
+      videosWatched: count(),
+      avgViewCount: avg(videos.viewCount),
+      avgLikeCount: avg(videos.likeCount),
+      totalViews: sql`SUM(${videos.viewCount})`,
+      totalLikes: sql`SUM(${videos.likeCount})`,
+      madeForKidsCount: sql`SUM(CASE WHEN ${videos.madeForKids} = 1 THEN 1 ELSE 0 END)`,
+      hasAgeRestriction: sql`MAX(CASE WHEN json_array_length(${videos.contentRating}) > 2 THEN 1 ELSE 0 END)`,
+    })
+    .from(videos)
+    .groupBy(videos.channelId, videos.channelTitle);
 
-  console.log(`Analyzing ${Object.keys(videoDetails).length} videos from ${watchHistory.length} watch history entries...\n`);
+  console.log(`Found ${channelStats.length} unique channels\n`);
 
-  let profiles = buildChannelProfiles(videoDetails, watchHistory);
-  console.log(`Found ${Object.keys(profiles).length} unique channels`);
+  // Enrich with watch times
+  for (const stat of channelStats) {
+    // Get watch times for this channel's videos
+    const watches = await db
+      .select({
+        watchedAt: watchHistory.watchedAt,
+        videoId: watchHistory.videoId,
+        title: watchHistory.title
+      })
+      .from(watchHistory)
+      .innerJoin(videos, sql`${watchHistory.videoId} = ${videos.id}`)
+      .where(sql`${videos.channelId} = ${stat.channelId}`)
+      .orderBy(desc(watchHistory.watchedAt));
 
-  profiles = await enrichChannelProfiles(profiles, cachePath);
+    stat.firstWatched = watches[watches.length - 1]?.watchedAt;
+    stat.lastWatched = watches[0]?.watchedAt;
+    stat.videos = watches;
+    stat.madeForKidsRatio = stat.madeForKidsCount / stat.videosWatched;
+  }
 
-  const sortedProfiles = Object.values(profiles).sort((a, b) => b.videosWatched - a.videosWatched);
+  // Get cached channels
+  const cachedChannels = (await db.select({id: channels.id}).from(channels)).map(c => c.id);
+  const uncachedChannels = channelStats.filter(s => !cachedChannels.includes(s.channelId));
 
-  fs.writeFileSync(outputPath, JSON.stringify(sortedProfiles, null, 2));
-  console.log(`✓ Saved channel profiles\n`);
+  if (uncachedChannels.length > 0) {
+    console.log('📡 Fetching channel information...');
 
-  return sortedProfiles;
+    for (const stat of uncachedChannels) {
+      console.log(`  Fetching: ${stat.channelTitle}...`);
+      const channelInfo = await fetchChannelInfo(stat.channelId);
+
+      if (channelInfo) {
+        await db.insert(channels).values({
+          id: stat.channelId,
+          title: channelInfo.snippet?.title || stat.channelTitle,
+          description: channelInfo.snippet?.description || '',
+          subscriberCount: parseInt(channelInfo.statistics?.subscriberCount || 0),
+          videoCount: parseInt(channelInfo.statistics?.videoCount || 0),
+          viewCount: parseInt(channelInfo.statistics?.viewCount || 0),
+          publishedAt: channelInfo.snippet?.publishedAt,
+          thumbnails: channelInfo.snippet?.thumbnails,
+        });
+
+        await new Promise(resolve => setTimeout(resolve, 1000));
+      }
+    }
+
+    console.log(`✓ Fetched ${uncachedChannels.length} new channels\n`);
+  }
+
+  // Get all channel info
+  const allChannels = await db.select().from(channels);
+  const channelLookup = Object.fromEntries(allChannels.map(c => [c.id, c]));
+
+  // Merge stats with channel info
+  const profiles = channelStats.map(stat => ({
+    ...stat,
+    channelInfo: channelLookup[stat.channelId],
+  })).sort((a, b) => b.videosWatched - a.videosWatched);
+
+  console.log('✓ Channel analysis complete\n');
+
+  return profiles;
 }
 
 export {analyzeChannels};

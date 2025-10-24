@@ -1,8 +1,9 @@
 import 'dotenv/config';
 import {google} from 'googleapis';
-import fs from 'fs';
 import path from 'path';
 import {fileURLToPath} from 'url';
+import {db, videos, watchHistory} from '../db/index.js';
+import {notInArray, sql} from 'drizzle-orm';
 
 const PROJECT_ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 const SERVICE_ACCOUNT_KEY = process.env.SERVICE_ACCOUNT_KEY_FILE || path.join(PROJECT_ROOT, 'service-account-key.json');
@@ -74,57 +75,63 @@ function processVideoData(video) {
     privacyStatus: status.privacyStatus,
     madeForKids: status.madeForKids,
     embeddable: status.embeddable,
-    fetchedAt: new Date().toISOString()
   };
 }
 
-async function analyzeVideos(videoIdsPath, outputPath) {
+async function analyzeVideos() {
   console.log('📺 YouTube Guardian - Video Analyzer');
   console.log('=====================================\n');
 
-  const videoData = JSON.parse(fs.readFileSync(videoIdsPath, 'utf-8'));
-  const videoIds = videoData.map(v => v.videoId);
-  console.log(`Found ${videoIds.length} videos to analyze\n`);
+  // Get all unique video IDs from watch history
+  const watchedVideos = await db.select({videoId: watchHistory.videoId})
+    .from(watchHistory)
+    .groupBy(watchHistory.videoId);
 
-  // Load cache
-  const cache = fs.existsSync(outputPath)
-    ? JSON.parse(fs.readFileSync(outputPath, 'utf-8'))
-    : {};
+  console.log(`Found ${watchedVideos.length} unique videos in watch history\n`);
 
-  if (Object.keys(cache).length > 0) {
-    console.log(`Loaded ${Object.keys(cache).length} cached videos\n`);
-  }
+  // Get already cached video IDs
+  const cachedVideoIds = (await db.select({id: videos.id}).from(videos)).map(v => v.id);
+  console.log(`Already cached: ${cachedVideoIds.length} videos\n`);
 
-  const uncachedIds = videoIds.filter(id => !cache[id]);
+  // Filter to uncached videos
+  const uncachedIds = watchedVideos
+    .map(v => v.videoId)
+    .filter(id => !cachedVideoIds.includes(id));
 
   if (uncachedIds.length === 0) {
     console.log('✓ All videos already cached!\n');
-    return cache;
+    return await db.select().from(videos);
   }
 
   console.log(`Fetching details for ${uncachedIds.length} new videos...`);
 
   // Process in batches of 50 (API limit)
   const batchSize = 50;
+  const newVideos = [];
+
   for (let i = 0; i < uncachedIds.length; i += batchSize) {
     const batch = uncachedIds.slice(i, i + batchSize);
-    console.log(`  Processing batch ${Math.floor(i / batchSize) + 1}/${Math.ceil(uncachedIds.length / batchSize)}...`);
+    console.log(`  Batch ${Math.floor(i / batchSize) + 1}/${Math.ceil(uncachedIds.length / batchSize)}...`);
 
-    const videos = await fetchVideoBatch(batch);
-    videos.forEach(video => {
-      cache[video.id] = processVideoData(video);
-    });
+    const fetchedVideos = await fetchVideoBatch(batch);
+    const processedVideos = fetchedVideos.map(processVideoData);
+    newVideos.push(...processedVideos);
 
-    // Rate limiting: wait 1 second between batches
+    // Insert into database
+    if (processedVideos.length > 0) {
+      await db.insert(videos).values(processedVideos);
+    }
+
+    // Rate limiting
     if (i + batchSize < uncachedIds.length) {
       await new Promise(resolve => setTimeout(resolve, 1000));
     }
   }
 
-  fs.writeFileSync(outputPath, JSON.stringify(cache, null, 2));
-  console.log(`\n✓ Saved ${Object.keys(cache).length} video details\n`);
+  console.log(`\n✓ Saved ${newVideos.length} new videos to database\n`);
 
-  return cache;
+  // Return all videos
+  return await db.select().from(videos);
 }
 
 export {analyzeVideos, fetchChannelInfo, getYouTubeClient};

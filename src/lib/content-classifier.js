@@ -1,6 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 import {fileURLToPath} from 'url';
+import {db, videos, classifications, classificationFlags} from '../db/index.js';
 
 const PROJECT_ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 
@@ -30,10 +31,6 @@ function checkKeywords(text, keywords) {
   return keywords.filter(k => lowerText.includes(k.toLowerCase()));
 }
 
-function addIssue(list, type, severity, message) {
-  list.push({type, severity, message});
-}
-
 function classifyVideo(video, blocklist, channelProfile) {
   const flags = [];
   const warnings = [];
@@ -41,39 +38,45 @@ function classifyVideo(video, blocklist, channelProfile) {
 
   // Check keywords
   const titleMatches = checkKeywords(video.title, blocklist.keywords);
-  if (titleMatches.length) addIssue(flags, 'BLOCKLIST_TITLE', 'HIGH', `Title: ${titleMatches.join(', ')}`);
+  if (titleMatches.length) {
+    flags.push({flagType: 'flags', type: 'BLOCKLIST_TITLE', severity: 'HIGH', message: `Title: ${titleMatches.join(', ')}`});
+  }
 
   const descMatches = checkKeywords(video.description, blocklist.keywords);
-  if (descMatches.length) addIssue(flags, 'BLOCKLIST_DESCRIPTION', 'MEDIUM', `Description: ${descMatches.join(', ')}`);
+  if (descMatches.length) {
+    flags.push({flagType: 'flags', type: 'BLOCKLIST_DESCRIPTION', severity: 'MEDIUM', message: `Description: ${descMatches.join(', ')}`});
+  }
 
-  const tagMatches = checkKeywords(video.tags.join(' '), blocklist.keywords);
-  if (tagMatches.length) addIssue(flags, 'BLOCKLIST_TAGS', 'MEDIUM', `Tags: ${tagMatches.join(', ')}`);
+  const tagMatches = checkKeywords((video.tags || []).join(' '), blocklist.keywords);
+  if (tagMatches.length) {
+    flags.push({flagType: 'flags', type: 'BLOCKLIST_TAGS', severity: 'MEDIUM', message: `Tags: ${tagMatches.join(', ')}`});
+  }
 
   // Check blocklists
   if (blocklist.channels.includes(video.channelId)) {
-    addIssue(flags, 'BLOCKLIST_CHANNEL', 'HIGH', `Channel "${video.channelTitle}" is blocked`);
+    flags.push({flagType: 'flags', type: 'BLOCKLIST_CHANNEL', severity: 'HIGH', message: `Channel "${video.channelTitle}" is blocked`});
   }
 
   if (blocklist.categories.includes(video.categoryId)) {
-    addIssue(flags, 'BLOCKLIST_CATEGORY', 'HIGH', `Category "${CATEGORY_NAMES[video.categoryId] || video.categoryId}" is blocked`);
+    flags.push({flagType: 'flags', type: 'BLOCKLIST_CATEGORY', severity: 'HIGH', message: `Category "${CATEGORY_NAMES[video.categoryId] || video.categoryId}" is blocked`});
   }
 
   // Check age restrictions
   if (video.contentRating && Object.keys(video.contentRating).length > 0) {
-    addIssue(warnings, 'AGE_RESTRICTED', 'HIGH', `Age restricted: ${JSON.stringify(video.contentRating)}`);
+    warnings.push({flagType: 'warnings', type: 'AGE_RESTRICTED', severity: 'HIGH', message: `Age restricted: ${JSON.stringify(video.contentRating)}`});
   }
 
   if (video.madeForKids === false) {
-    addIssue(info, 'NOT_FOR_KIDS', 'LOW', 'Not marked for kids');
+    info.push({flagType: 'info', type: 'NOT_FOR_KIDS', severity: 'LOW', message: 'Not marked for kids'});
   }
 
   // Channel reputation
   if (channelProfile?.hasAgeRestriction) {
-    addIssue(warnings, 'CHANNEL_HAS_RESTRICTED_CONTENT', 'MEDIUM', `Channel has age-restricted content`);
+    warnings.push({flagType: 'warnings', type: 'CHANNEL_HAS_RESTRICTED_CONTENT', severity: 'MEDIUM', message: 'Channel has age-restricted content'});
   }
 
   if (channelProfile && channelProfile.madeForKidsRatio < 0.1 && channelProfile.videosWatched > 3) {
-    addIssue(info, 'CHANNEL_NOT_KID_FOCUSED', 'LOW', 'Channel rarely posts kid content');
+    info.push({flagType: 'info', type: 'CHANNEL_NOT_KID_FOCUSED', severity: 'LOW', message: 'Channel rarely posts kid content'});
   }
 
   const riskLevel = flags.length > 0 ? 'HIGH' : warnings.length > 0 ? 'MEDIUM' : 'LOW';
@@ -88,12 +91,10 @@ function classifyVideo(video, blocklist, channelProfile) {
     flags,
     warnings,
     info,
-    flagCount: flags.length,
-    warningCount: warnings.length
   };
 }
 
-function classifyAllVideos(videoDetails, channelProfiles) {
+async function classifyAllVideos(allVideos, channelProfiles) {
   console.log('🔍 Content Classifier');
   console.log('====================\n');
 
@@ -102,12 +103,39 @@ function classifyAllVideos(videoDetails, channelProfiles) {
 
   const channelLookup = Object.fromEntries(channelProfiles.map(p => [p.channelId, p]));
 
+  // Clear existing classifications
+  await db.delete(classifications);
+  await db.delete(classificationFlags);
+
   const summary = {highRisk: 0, mediumRisk: 0, lowRisk: 0};
-  const results = Object.values(videoDetails).map(video => {
+  const results = [];
+
+  for (const video of allVideos) {
     const result = classifyVideo(video, blocklist, channelLookup[video.channelId]);
+    results.push(result);
+
+    // Update summary
     summary[result.riskLevel === 'HIGH' ? 'highRisk' : result.riskLevel === 'MEDIUM' ? 'mediumRisk' : 'lowRisk']++;
-    return result;
-  });
+
+    // Insert classification
+    await db.insert(classifications).values({
+      videoId: result.videoId,
+      riskLevel: result.riskLevel,
+      flagCount: result.flags.length,
+      warningCount: result.warnings.length,
+      infoCount: result.info.length,
+    });
+
+    // Insert all flags
+    const allFlags = [...result.flags, ...result.warnings, ...result.info].map(f => ({
+      videoId: result.videoId,
+      ...f
+    }));
+
+    if (allFlags.length > 0) {
+      await db.insert(classificationFlags).values(allFlags);
+    }
+  }
 
   console.log(`HIGH: ${summary.highRisk} | MEDIUM: ${summary.mediumRisk} | LOW: ${summary.lowRisk}\n`);
 

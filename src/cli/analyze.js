@@ -18,24 +18,16 @@ async function main() {
 
   try {
     console.log('Step 1/4: Fetching video details...\n');
-    const videoDetails = await analyzeVideos(
-      path.join(DATA, 'video-ids.json'),
-      path.join(DATA, 'video-details.json')
-    );
+    const videoDetails = await analyzeVideos();
 
     console.log('\nStep 2/4: Analyzing channels...\n');
-    const channelProfiles = await analyzeChannels(
-      path.join(DATA, 'video-details.json'),
-      path.join(DATA, 'watch-history.json'),
-      path.join(DATA, 'channel-profiles.json'),
-      path.join(DATA, 'channel-cache.json')
-    );
+    const channelProfiles = await analyzeChannels();
 
     console.log('\nStep 3/4: Classifying content...\n');
-    const classification = classifyAllVideos(videoDetails, channelProfiles);
+    const classification = await classifyAllVideos(videoDetails, channelProfiles);
 
     console.log('\nStep 4/4: Generating report...\n');
-    generateReport(videoDetails, channelProfiles, classification, path.join(DATA, 'analysis-results.json'));
+    await generateReport(videoDetails, channelProfiles, classification, path.join(DATA, 'analysis-results.json'));
 
     console.log('✅ Analysis complete!\n');
   } catch (error) {

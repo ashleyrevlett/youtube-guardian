@@ -4,3 +4,8 @@ service-account-key.json
 oauth2.keys.json
 data/
 .DS_Store
+
+# SQLite database files
+*.db
+*.db-shm
+*.db-wal

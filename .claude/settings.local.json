@@ -6,7 +6,10 @@
       "Bash(node:*)",
       "Bash(npm run analyze:*)",
       "Bash(npm run parse:*)",
-      "Bash(find:*)"
+      "Bash(find:*)",
+      "Bash(npm install:*)",
+      "Bash(npm run db:push:*)",
+      "Bash(sqlite3:*)"
     ],
     "deny": [],
     "ask": []
