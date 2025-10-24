@@ -134,3 +134,11 @@ The architecture supports adding:
 - **Service account authentication** is used for server-to-server communication
 - All data is stored **locally** - nothing is sent to external services
 - The YouTube Data API has **quota limits** - caching helps manage this
+
+## Todo
+
+- [ ] Automate watch history export, for an auth'd user
+- [ ] Deploy app to cloud
+- [ ] Automate app to run on cron
+- [ ] Change terminal export to emailed report
+- [ ] Add ML classifiers to review transcript, thumbnails, sentiment for deeper analysis of video content
