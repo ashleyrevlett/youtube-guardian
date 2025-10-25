@@ -61,29 +61,7 @@ export const channels = sqliteTable('channels', {
   fetchedAt: integer('fetched_at', {mode: 'timestamp'}).default(sql`(unixepoch())`),
 });
 
-// Content classification results
-export const classifications = sqliteTable('classifications', {
-  videoId: text('video_id').primaryKey(),
-  riskLevel: text('risk_level').notNull(),  // HIGH, MEDIUM, LOW
-  riskScore: real('risk_score'),
-  flagCount: integer('flag_count').default(0),
-  warningCount: integer('warning_count').default(0),
-  infoCount: integer('info_count').default(0),
-  analyzedAt: integer('analyzed_at', {mode: 'timestamp'}).default(sql`(unixepoch())`),
-});
-
-// Individual classification flags/warnings
-export const classificationFlags = sqliteTable('classification_flags', {
-  id: integer('id').primaryKey({autoIncrement: true}),
-  videoId: text('video_id').notNull(),
-  flagType: text('flag_type').notNull(),  // flags, warnings, or info
-  type: text('type').notNull(),
-  severity: text('severity').notNull(),
-  message: text('message').notNull(),
-  createdAt: integer('created_at', {mode: 'timestamp'}).default(sql`(unixepoch())`),
-});
-
-// Tags table - unique tags across all videos
+// Tags table - unique tags across all videos (YouTube native + AI-generated)
 export const tags = sqliteTable('tags', {
   id: integer('id').primaryKey({autoIncrement: true}),
   name: text('name').notNull().unique(),

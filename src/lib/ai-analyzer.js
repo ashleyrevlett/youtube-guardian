@@ -69,13 +69,22 @@ async function analyzeWithAI(transcript) {
 
 /**
  * Store tags in normalized database schema (many-to-many)
+ * Merges YouTube's native tags with AI-generated tags
  * @param {string} videoId - YouTube video ID
- * @param {string[]} tagNames - Array of tag names
+ * @param {string[]} aiTagNames - Array of AI-generated tag names
  */
-async function storeTags(videoId, tagNames) {
+async function storeTags(videoId, aiTagNames) {
+  // Get YouTube's native tags from videos table
+  const [video] = await db.select().from(videos).where(eq(videos.id, videoId));
+  const youtubeTags = video?.tags || [];
+
+  // Merge YouTube tags + AI tags (deduplicated, case-insensitive)
+  const allTagNames = [...youtubeTags, ...aiTagNames];
+  const uniqueTags = [...new Set(allTagNames.map(t => t.toLowerCase()))];
+
   const tagIds = [];
 
-  for (const tagName of tagNames) {
+  for (const tagName of uniqueTags) {
     // Get or create tag
     const existingTags = await db.select().from(tags).where(eq(tags.name, tagName));
 
@@ -93,7 +102,7 @@ async function storeTags(videoId, tagNames) {
     await db.insert(videoTags).values({
       videoId,
       tagId
-    });
+    }).onConflictDoNothing();
   }
 }
 
