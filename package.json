@@ -7,6 +7,7 @@
     "test": "echo \"Error: no test specified\" && exit 1",
     "ingest": "node src/cli/ingest.js",
     "analyze": "node src/cli/analyze.js",
+    "report": "node src/cli/report.js",
     "download": "node src/cli/download-videos.js",
     "cleanup-videos": "node src/cli/cleanup-videos.js",
     "start": "npm run db:push && npm run ingest && npm run analyze",
