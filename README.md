@@ -5,12 +5,14 @@ A parental monitoring system for analyzing YouTube watch history and detecting p
 ## Features
 
 - 📊 **Watch History Analysis** - Parse and analyze YouTube watch history exports
-- 🔍 **Content Classification** - Flag videos based on customizable blocklists
+- 🔍 **Content Classification** - Flag videos based on customizable blocklists and age ratings (MPAA, BBFC)
 - 📺 **Channel Profiling** - Track viewing patterns by channel
 - ⚠️ **Risk Assessment** - Categorize content as HIGH, MEDIUM, or LOW risk
 - 📋 **Terminal Reports** - Color-coded, easy-to-read monitoring reports
 - 💾 **Smart Caching** - SQLite database with intelligent caching to minimize API usage
 - 🗄️ **Database Storage** - Drizzle ORM with SQLite for efficient data management
+- 🎬 **Video Downloads** - Download actual video files using yt-dlp for offline analysis
+- 📝 **Caption Downloads** - Extract subtitles/transcripts for text-based content review
 
 ## Prerequisites
 
@@ -78,9 +80,27 @@ npm run analyze
 ```
 1. Fetches video metadata from YouTube API (with smart caching in database)
 2. Analyzes channel profiles and viewing patterns
-3. Classifies content based on your blocklist
+3. Classifies content based on your blocklist and age ratings (MPAA, BBFC)
 4. Generates a color-coded terminal report
 5. Exports findings to `data/analysis-results.json`
+
+**Download Videos (Optional)**
+```bash
+npm run download
+```
+Downloads videos (MP4, lowest quality) to `data/videos/` using yt-dlp for offline AI analysis.
+
+**Download Captions (Optional)**
+```bash
+npm run download-captions
+```
+Downloads English captions/subtitles (SRT format) to `data/captions/` for text analysis.
+
+**Cleanup**
+```bash
+npm run cleanup-videos
+```
+Deletes downloaded videos to free disk space.
 
 ### Database Operations
 
@@ -144,24 +164,41 @@ The terminal report includes:
 4. **Category Breakdown** - Content distribution by category
 5. **Recommendations** - Actionable next steps
 
+## Workflow
+
+```bash
+npm run parse              # Parse watch history
+npm run analyze            # Analyze & report
+npm run download           # (Optional) Download videos
+npm run download-captions  # (Optional) Download captions
+npm run cleanup-videos     # Clean up downloads
+```
+
 ## Future Enhancements
 
 The architecture supports adding:
 
-- 🤖 **ML Classification** - AI-based content analysis
-- 📝 **Transcript Analysis** - Analyze video captions for concerning language
-- 💬 **Comment Analysis** - Review viewer comments
+- 🤖 **AI Classification** - Analyze videos and transcripts using LLMs (OpenAI, Claude, Gemini, local models)
+- 📸 **Thumbnail Analysis** - Visual content screening using computer vision
+- 💬 **Comment Analysis** - Review viewer comments for warning signs
 - 🌐 **Web Dashboard** - Interactive monitoring interface
 - 📧 **Email Alerts** - Automated notifications for concerning content
+- 📈 **Trend Analysis** - Track viewing patterns over time
 
 
 ## Notes
 
 - The system uses **SQLite database** with smart caching to minimize YouTube API quota usage
 - **Service account authentication** is used for server-to-server communication
-- All data is stored **locally** in `data/guardian.db` - nothing is sent to external services
+- All data is stored **locally** - nothing is sent to external services except YouTube API calls
 - The YouTube Data API has **quota limits** (10,000 units/day) - database caching helps manage this
 - Database is excluded from git via `.gitignore` - each user maintains their own local database
+
+### Storage
+
+- Database: ~1-5 MB
+- Videos: ~10-50 MB each (lowest quality)
+- Captions: ~5-20 KB each (text)
 
 ## Todo
 
