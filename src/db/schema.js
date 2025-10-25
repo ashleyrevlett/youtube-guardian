@@ -82,6 +82,8 @@ export const aiAnalysis = sqliteTable('ai_analysis', {
   riskLevel: text('risk_level'),        // HIGH, MEDIUM, LOW
   summary: text('summary'),             // Brief 1-sentence video summary
   reasoning: text('reasoning'),         // AI's explanation
+  contentFlags: text('content_flags', {mode: 'json'}),  // Array of objectionable content flags
+  flaggedSeverity: text('flagged_severity'),  // SEVERE, MODERATE, NONE
   model: text('model'),                 // gpt-4o-mini
   analyzedAt: integer('analyzed_at', {mode: 'timestamp'}).default(sql`(unixepoch())`),
 });

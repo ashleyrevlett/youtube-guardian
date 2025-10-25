@@ -163,8 +163,15 @@ The terminal report includes:
 ## Workflow
 
 ```bash
-npm run ingest             # Collect metadata (parse + API + captions)
+
+npm start # ingest, analyze, show report
+
+# pipeline
+npm run ingest             # Collect metadata (parse + API + captions), with optional limit param
 npm run analyze            # AI analysis + report
+npm run report             # Display report from last run
+
+# WIP
 npm run download           # (Optional) Download videos
 npm run cleanup-videos     # Clean up downloads
 ```

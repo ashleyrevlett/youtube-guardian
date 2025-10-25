@@ -7,21 +7,45 @@ import {getCaptionFile} from './caption-downloader.js';
 import {db, aiAnalysis, tags, videoTags, videos} from '../db/index.js';
 import {eq} from 'drizzle-orm';
 
-const SYSTEM_PROMPT = `You are a content safety analyzer for parental monitoring of children's YouTube viewing.
+const SYSTEM_PROMPT = `You are a content safety analyzer detecting objectionable content in video transcripts.
 
-Analyze the video transcript and provide:
-1. Summary - very concise 1-sentence description of what the video is about
-2. Tags - relevant topics/themes/concerns (e.g., violence, education, gaming, profanity, scary-content, adult-themes)
-3. Risk level - HIGH (inappropriate for kids), MEDIUM (parental guidance recommended), or LOW (safe for kids)
-4. Reasoning - brief explanation of the risk assessment
+Analyze the transcript across these dimensions:
 
-Return JSON format:
+CONTENT FLAGS - Detect any of these objectionable elements:
+1. Political Content
+   - extreme-political: Extreme political views, conspiracy theories, political radicalization
+   - political-divisive: Highly divisive political commentary, partisan attacks
+
+2. Offensive/Inappropriate
+   - profanity: Excessive swearing, vulgar language
+   - sexual-content: Sexual references, innuendo, adult themes
+   - graphic-violence: Descriptions of graphic violence, gore
+   - hate-speech: Racist, sexist, homophobic, or discriminatory content
+
+3. Harmful Content
+   - misinformation: Clear misinformation, dangerous medical/health claims
+   - scary-disturbing: Horror content, disturbing imagery descriptions
+   - exploitation: Clickbait, manipulation, exploitative content
+
+4. Tone/Style
+   - obnoxious: Overly loud, annoying, aggressive presentation style
+   - inflammatory: Deliberately provocative, rage-baiting content
+
+Return JSON:
 {
-  "summary": "One sentence describing the video content",
-  "tags": ["tag1", "tag2", "tag3"],
+  "summary": "One sentence video description",
+  "tags": ["topic1", "topic2"],
+  "contentFlags": ["flag1", "flag2"],
+  "flaggedSeverity": "SEVERE|MODERATE|NONE",
   "riskLevel": "HIGH|MEDIUM|LOW",
-  "reasoning": "Brief explanation"
-}`;
+  "reasoning": "Explanation of flags and risk"
+}
+
+Guidelines:
+- tags are general topics (gaming, cooking, education, etc.)
+- contentFlags should be empty array if no objectionable content (use flag keys listed above)
+- flaggedSeverity: SEVERE = multiple serious flags or extreme content, MODERATE = some concerning elements, NONE = clean
+- riskLevel considers both content appropriateness AND flags`;
 
 /**
  * Parse SRT caption file to plain text transcript
@@ -130,6 +154,8 @@ async function analyzeVideo(videoId) {
     riskLevel: result.riskLevel,
     summary: result.summary,
     reasoning: result.reasoning,
+    contentFlags: result.contentFlags || [],
+    flaggedSeverity: result.flaggedSeverity || 'NONE',
     model: 'gpt-4o-mini'
   });
 

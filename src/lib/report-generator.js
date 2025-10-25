@@ -207,6 +207,55 @@ async function generateReport() {
   console.log(`  ${colorize('LOW', 'green')} risk: ${riskCounts.LOW}`);
   console.log();
 
+  // Flagged content section
+  const flaggedVideos = analyzedVideos.filter(v => {
+    const flags = analysisMap[v.id].contentFlags || [];
+    return flags.length > 0;
+  });
+
+  console.log(colorize('Flagged Content:', 'bold'));
+  console.log('─'.repeat(80));
+  console.log();
+
+  if (flaggedVideos.length === 0) {
+    console.log(colorize('  ✓ No objectionable content detected', 'green'));
+    console.log();
+  } else {
+    // Group by severity
+    const severe = flaggedVideos.filter(v => analysisMap[v.id].flaggedSeverity === 'SEVERE');
+    const moderate = flaggedVideos.filter(v => analysisMap[v.id].flaggedSeverity === 'MODERATE');
+
+    if (severe.length > 0) {
+      console.log(colorize(`SEVERE (${severe.length} videos):`, 'red'));
+      severe.forEach(video => {
+        const analysis = analysisMap[video.id];
+        const flags = analysis.contentFlags || [];
+        console.log(`  • ${video.title}`);
+        console.log(`    ${colorize('Flags:', 'gray')} ${colorize(flags.join(', '), 'red')}`);
+        if (analysis.reasoning) {
+          console.log(`    ${colorize('→', 'gray')} ${analysis.reasoning}`);
+        }
+        console.log();
+      });
+    }
+
+    if (moderate.length > 0) {
+      console.log(colorize(`MODERATE (${moderate.length} videos):`, 'yellow'));
+      moderate.forEach(video => {
+        const analysis = analysisMap[video.id];
+        const flags = analysis.contentFlags || [];
+        console.log(`  • ${video.title}`);
+        console.log(`    ${colorize('Flags:', 'gray')} ${colorize(flags.join(', '), 'yellow')}`);
+        if (analysis.reasoning) {
+          console.log(`    ${colorize('→', 'gray')} ${analysis.reasoning}`);
+        }
+        console.log();
+      });
+    }
+
+    console.log();
+  }
+
   // Tag cloud
   await generateTagCloud();
 
