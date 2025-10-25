@@ -1,9 +1,8 @@
-// Video downloader with rate limiting for third-party YouTube API
+// Video downloader using yt-dlp binary
 import fs from 'fs';
 import path from 'path';
 import {fileURLToPath} from 'url';
-import {pipeline} from 'stream/promises';
-import {createWriteStream} from 'fs';
+import {spawn} from 'child_process';
 
 const PROJECT_ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 const VIDEOS_DIR = path.join(PROJECT_ROOT, 'data', 'videos');
@@ -11,10 +10,7 @@ const VIDEOS_DIR = path.join(PROJECT_ROOT, 'data', 'videos');
 // Rate limiting defaults
 const DEFAULTS = {
   concurrency: 1,              // Sequential downloads only
-  delayBetweenRequests: 1000,  // 1 second between API calls
-  timeout: 30000,              // 30 second timeout
-  maxRetries: 3,               // Max retry attempts
-  retryDelay: 2000,            // Initial retry delay (2s, 4s, 8s...)
+  delayBetweenRequests: 1000,  // 1 second between downloads
   batchSize: 10,               // Download in batches of 10
   batchPauseMs: 5000           // 5 second pause between batches
 };
@@ -38,186 +34,75 @@ function formatBytes(bytes) {
 }
 
 /**
- * Fetch video MP4 URL from third-party API with retry and exponential backoff
+ * Download video using yt-dlp binary
  * @param {string} videoId - YouTube video ID
- * @param {string} apiEndpoint - Third-party API endpoint
- * @param {number} attempt - Current retry attempt
- * @returns {Promise<{url: string, quality: string}>}
- */
-async function fetchVideoUrl(videoId, apiEndpoint, attempt = 1) {
-  try {
-    // Construct YouTube URL from video ID
-    const youtubeUrl = `https://www.youtube.com/watch?v=${videoId}`;
-
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), DEFAULTS.timeout);
-
-    // POST request with YouTube URL in body
-    const response = await fetch(apiEndpoint, {
-      method: 'POST',
-      signal: controller.signal,
-      headers: {
-        'Content-Type': 'application/json',
-        'Accept': 'application/json'
-      },
-      body: JSON.stringify({url: youtubeUrl})
-    });
-
-    clearTimeout(timeoutId);
-
-    // Check for rate limiting
-    if (response.status === 429 || response.status === 503) {
-      if (attempt >= DEFAULTS.maxRetries) {
-        throw new Error('Rate limited - max retries exceeded');
-      }
-
-      const delay = DEFAULTS.retryDelay * Math.pow(2, attempt - 1);
-      console.log(`  ⏸  Rate limited (${response.status}), waiting ${delay/1000}s before retry...`);
-      await sleep(delay);
-      return fetchVideoUrl(videoId, apiEndpoint, attempt + 1);
-    }
-
-    if (!response.ok) {
-      throw new Error(`API error: ${response.status} ${response.statusText}`);
-    }
-
-    const data = await response.json();
-
-    // Check for API errors
-    if (data.error) {
-      throw new Error(`API error: ${data.error}`);
-    }
-
-    // Extract MP4 URL from response - find lowest resolution MP4 video
-    let mp4Url = null;
-    let selectedMedia = null;
-
-    if (data.medias && Array.isArray(data.medias)) {
-      // Filter to only MP4 video formats
-      const mp4Videos = data.medias.filter(m =>
-        m.type === 'video' &&
-        m.ext === 'mp4' &&
-        m.width &&
-        m.height &&
-        m.url
-      );
-
-      if (mp4Videos.length > 0) {
-        // Sort by resolution (width * height) ascending, pick the smallest
-        mp4Videos.sort((a, b) => (a.width * a.height) - (b.width * b.height));
-        selectedMedia = mp4Videos[0];
-        mp4Url = selectedMedia.url;
-      }
-    }
-
-    // Fallback: try direct URL fields if medias array not found
-    if (!mp4Url) {
-      mp4Url = data.url || data.downloadUrl || data.mp4Url || data.link;
-    }
-
-    if (!mp4Url) {
-      throw new Error('No MP4 URL found in API response');
-    }
-
-    return {
-      url: mp4Url,
-      quality: selectedMedia?.quality || selectedMedia?.label || 'lowest',
-      width: selectedMedia?.width,
-      height: selectedMedia?.height,
-      format: 'mp4'
-    };
-
-  } catch (error) {
-    // Handle network errors with retry
-    if (error.name === 'AbortError') {
-      throw new Error('Request timeout');
-    }
-
-    if (attempt < DEFAULTS.maxRetries && !error.message.includes('Rate limited')) {
-      const delay = DEFAULTS.retryDelay * Math.pow(2, attempt - 1);
-      console.log(`  ⚠️  Error: ${error.message}, retrying in ${delay/1000}s...`);
-      await sleep(delay);
-      return fetchVideoUrl(videoId, apiEndpoint, attempt + 1);
-    }
-
-    throw error;
-  }
-}
-
-/**
- * Resolve redirect URL to final destination
- * @param {string} url - URL that may redirect
- * @returns {Promise<string>} Final resolved URL
- */
-async function resolveRedirectUrl(url) {
-  try {
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), DEFAULTS.timeout);
-
-    // Make HEAD request to follow redirects without downloading
-    const response = await fetch(url, {
-      method: 'HEAD',
-      signal: controller.signal,
-      redirect: 'follow' // Follow redirects automatically
-    });
-
-    clearTimeout(timeoutId);
-
-    // Return the final URL after all redirects
-    return response.url;
-  } catch (error) {
-    // If HEAD fails, return original URL and let download handle it
-    console.log(`  ⚠️  Could not resolve redirect: ${error.message}, using original URL`);
-    return url;
-  }
-}
-
-/**
- * Download MP4 file from URL to local storage
- * @param {string} videoId - YouTube video ID (used for filename)
- * @param {string} mp4Url - Direct URL to MP4 file (may be a redirect)
  * @returns {Promise<{filePath: string, fileSize: number}>}
  */
-async function downloadVideo(videoId, mp4Url) {
+async function downloadVideo(videoId) {
   // Ensure videos directory exists
   if (!fs.existsSync(VIDEOS_DIR)) {
     fs.mkdirSync(VIDEOS_DIR, {recursive: true});
   }
 
-  const filePath = path.join(VIDEOS_DIR, `${videoId}.mp4`);
+  const youtubeUrl = `https://www.youtube.com/watch?v=${videoId}`;
+  const outputTemplate = path.join(VIDEOS_DIR, `${videoId}.mp4`);
 
-  try {
-    // Resolve redirects first to get final URL
-    const resolvedUrl = await resolveRedirectUrl(mp4Url);
+  return new Promise((resolve, reject) => {
+    // yt-dlp command with options for lowest quality MP4
+    const args = [
+      youtubeUrl,
+      '-f', 'worst[ext=mp4]/worst',  // Get worst quality MP4 (smallest file)
+      '-o', outputTemplate,           // Output filename
+      '--no-playlist',                // Don't download playlists
+      '--no-warnings',                // Suppress warnings
+      '--quiet',                      // Minimal output
+      '--progress'                    // Show progress
+    ];
 
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), DEFAULTS.timeout * 2); // Longer timeout for download
+    const ytdlp = spawn('yt-dlp', args);
 
-    const response = await fetch(resolvedUrl, {signal: controller.signal});
-    clearTimeout(timeoutId);
+    let errorOutput = '';
 
-    if (!response.ok) {
-      throw new Error(`Download failed: ${response.status} ${response.statusText}`);
-    }
+    // Capture stderr for errors
+    ytdlp.stderr.on('data', (data) => {
+      errorOutput += data.toString();
+    });
 
-    // Stream download to file
-    await pipeline(response.body, createWriteStream(filePath));
+    // Capture stdout for progress (optional)
+    ytdlp.stdout.on('data', (data) => {
+      const output = data.toString().trim();
+      if (output) {
+        // Optional: parse progress output
+        // yt-dlp outputs progress like: [download]  45.2% of 12.34MiB at 1.23MiB/s ETA 00:05
+        process.stdout.write(`\r  ${output}`);
+      }
+    });
 
-    // Get file size
-    const stats = fs.statSync(filePath);
+    ytdlp.on('close', (code) => {
+      process.stdout.write('\n'); // Clear progress line
 
-    return {
-      filePath,
-      fileSize: stats.size
-    };
+      if (code === 0) {
+        // Download successful, get file size
+        if (fs.existsSync(outputTemplate)) {
+          const stats = fs.statSync(outputTemplate);
+          resolve({
+            filePath: outputTemplate,
+            fileSize: stats.size
+          });
+        } else {
+          reject(new Error('Download completed but file not found'));
+        }
+      } else {
+        // Download failed
+        const error = errorOutput.trim() || `yt-dlp exited with code ${code}`;
+        reject(new Error(error));
+      }
+    });
 
-  } catch (error) {
-    // Clean up partial download
-    if (fs.existsSync(filePath)) {
-      fs.unlinkSync(filePath);
-    }
-    throw error;
-  }
+    ytdlp.on('error', (error) => {
+      reject(new Error(`Failed to spawn yt-dlp: ${error.message}`));
+    });
+  });
 }
 
 /**
@@ -233,21 +118,19 @@ function isVideoDownloaded(videoId) {
 /**
  * Download all videos with rate limiting and batch processing
  * @param {string[]} videoIds - Array of YouTube video IDs
- * @param {string} apiEndpoint - Third-party API endpoint
- * @returns {Promise<{success: number, failed: number, skipped: number, totalSize: number, rateLimited: number}>}
+ * @returns {Promise<{success: number, failed: number, skipped: number, totalSize: number, errors: Array}>}
  */
-async function downloadAllVideos(videoIds, apiEndpoint) {
+async function downloadAllVideos(videoIds) {
   const results = {
     success: 0,
     failed: 0,
     skipped: 0,
     totalSize: 0,
-    rateLimited: 0,
     errors: []
   };
 
-  console.log(`\nDownloading ${videoIds.length} videos (sequential with rate limiting)...`);
-  console.log(`Rate limits: ${DEFAULTS.delayBetweenRequests/1000}s between requests, ${DEFAULTS.batchPauseMs/1000}s pause every ${DEFAULTS.batchSize} videos\n`);
+  console.log(`\nDownloading ${videoIds.length} videos using yt-dlp (sequential)...`);
+  console.log(`Rate limits: ${DEFAULTS.delayBetweenRequests/1000}s between downloads, ${DEFAULTS.batchPauseMs/1000}s pause every ${DEFAULTS.batchSize} videos\n`);
 
   const startTime = Date.now();
 
@@ -263,39 +146,27 @@ async function downloadAllVideos(videoIds, apiEndpoint) {
     }
 
     try {
-      console.log(`${progress} Fetching URL for ${videoId}...`);
-
-      // Step 1: Fetch MP4 URL from API
-      const {url} = await fetchVideoUrl(videoId, apiEndpoint);
-
-      // Rate limit delay before download
-      await sleep(DEFAULTS.delayBetweenRequests);
-
-      // Step 2: Download the video
       console.log(`${progress} Downloading ${videoId}...`);
-      const {fileSize} = await downloadVideo(videoId, url);
+
+      const {fileSize} = await downloadVideo(videoId);
 
       results.success++;
       results.totalSize += fileSize;
 
       console.log(`${progress} ✓ ${videoId} (${formatBytes(fileSize)})`);
 
-      // Batch pause to avoid overwhelming API
+      // Rate limit delay between downloads (except after last video)
+      if (i + 1 < videoIds.length) {
+        await sleep(DEFAULTS.delayBetweenRequests);
+      }
+
+      // Batch pause to avoid overwhelming system
       if ((i + 1) % DEFAULTS.batchSize === 0 && i + 1 < videoIds.length) {
-        console.log(`\n  ⏸  Batch of ${DEFAULTS.batchSize} complete, pausing ${DEFAULTS.batchPauseMs/1000}s to avoid rate limits...\n`);
+        console.log(`\n  ⏸  Batch of ${DEFAULTS.batchSize} complete, pausing ${DEFAULTS.batchPauseMs/1000}s...\n`);
         await sleep(DEFAULTS.batchPauseMs);
       }
 
     } catch (error) {
-      // Check if rate limited
-      if (error.message.includes('Rate limited')) {
-        results.rateLimited++;
-        console.log(`${progress} ✗ ${videoId} - ${error.message}`);
-        console.log(`\n⚠️  Stopping downloads to avoid API ban. Run again later to resume.\n`);
-        results.errors.push({videoId, error: error.message});
-        break; // Stop entirely if rate limited
-      }
-
       results.failed++;
       console.log(`${progress} ✗ ${videoId} - ${error.message}`);
       results.errors.push({videoId, error: error.message});
@@ -310,9 +181,6 @@ async function downloadAllVideos(videoIds, apiEndpoint) {
   console.log(`  ✓ Downloaded: ${results.success} videos (${formatBytes(results.totalSize)})`);
   console.log(`  ⊘ Skipped: ${results.skipped} videos (already downloaded)`);
   console.log(`  ✗ Failed: ${results.failed} videos`);
-  if (results.rateLimited > 0) {
-    console.log(`  ⚠️  Rate limited: ${results.rateLimited} times`);
-  }
   console.log(`  ⏱  Total time: ${duration}s (avg ${avgTime}s per video)`);
   console.log();
 

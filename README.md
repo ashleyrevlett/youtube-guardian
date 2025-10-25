@@ -17,6 +17,7 @@ A parental monitoring system for analyzing YouTube watch history and detecting p
 1. **Google Cloud Project** with YouTube Data API v3 enabled
 2. **Service Account** with a downloaded JSON key file
 3. **YouTube watch history** exported as JSON (from Google Takeout)
+4. yt-dlp and its dependencies installed and available via terminal
 
 ## Setup
 
@@ -24,6 +25,7 @@ A parental monitoring system for analyzing YouTube watch history and detecting p
 ```bash
 nvm use
 npm install
+brew install ffmpeg yt-dlp
 ```
 
 2. Set up Google Cloud:

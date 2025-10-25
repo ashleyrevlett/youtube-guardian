@@ -8,21 +8,7 @@ async function main() {
   console.log('📥 YouTube Guardian - Video Downloader');
   console.log('======================================\n');
 
-  // Check for API endpoint argument
-  const apiEndpoint = process.argv[2];
-
-  if (!apiEndpoint) {
-    console.error('❌ Error: API endpoint required\n');
-    console.log('Usage: npm run download <api-endpoint>\n');
-    console.log('Example:');
-    console.log('  npm run download "https://downr.org/.netlify/functions/download"\n');
-    console.log('The endpoint should accept POST requests with:');
-    console.log('  Body: { "url": "https://www.youtube.com/watch?v=VIDEO_ID" }');
-    console.log('  Response: { "medias": [...], ... }\n');
-    process.exit(1);
-  }
-
-  console.log(`API Endpoint: ${apiEndpoint}`);
+  console.log('Using: yt-dlp binary');
   console.log(`Storage: data/videos/\n`);
 
   try {
@@ -56,21 +42,17 @@ async function main() {
       process.exit(0);
     }
 
-    console.log('\n⚠️  Note: Downloads are rate-limited to avoid API bans');
+    console.log('\n⚠️  Note: Downloads are rate-limited');
     console.log('This may take several minutes. You can stop (Ctrl+C) and resume later.\n');
 
     // Download all videos with rate limiting
-    const results = await downloadAllVideos(videoIds, apiEndpoint);
+    const results = await downloadAllVideos(videoIds);
 
     // Final summary
     if (results.success > 0) {
       console.log('✅ Download complete!');
       console.log(`\nVideos saved to: data/videos/`);
       console.log(`Use "npm run cleanup-videos" to delete when done\n`);
-    } else if (results.rateLimited > 0) {
-      console.log('⚠️  Stopped due to rate limiting');
-      console.log('Wait a few minutes and run this command again to resume.\n');
-      process.exit(1);
     } else {
       console.log('❌ No videos were downloaded');
       if (results.errors.length > 0) {
