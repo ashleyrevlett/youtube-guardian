@@ -79,7 +79,7 @@ function processVideoData(video) {
   };
 }
 
-async function analyzeVideos() {
+async function analyzeVideos(limit = null) {
   console.log('📺 YouTube Guardian - Video Analyzer');
   console.log('=====================================\n');
 
@@ -95,9 +95,15 @@ async function analyzeVideos() {
   console.log(`Already cached: ${cachedVideoIds.length} videos\n`);
 
   // Filter to uncached videos
-  const uncachedIds = watchedVideos
+  let uncachedIds = watchedVideos
     .map(v => v.videoId)
     .filter(id => !cachedVideoIds.includes(id));
+
+  // Apply limit if specified
+  if (limit && uncachedIds.length > limit) {
+    console.log(`⚠️  Limiting to ${limit} videos\n`);
+    uncachedIds = uncachedIds.slice(0, limit);
+  }
 
   if (uncachedIds.length === 0) {
     console.log('✓ All videos already cached!\n');

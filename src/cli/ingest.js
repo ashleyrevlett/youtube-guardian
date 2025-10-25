@@ -80,6 +80,23 @@ async function main() {
   console.log('║                Metadata Collection Pipeline                   ║');
   console.log('╚════════════════════════════════════════════════════════════════╝\n');
 
+  // Parse optional limit argument
+  const limitArg = process.argv[2];
+  const limit = limitArg ? parseInt(limitArg, 10) : null;
+
+  if (limitArg && (isNaN(limit) || limit <= 0)) {
+    console.error('❌ Error: Limit must be a positive number\n');
+    console.log('Usage: npm run ingest [limit]\n');
+    console.log('Examples:');
+    console.log('  npm run ingest     # Ingest all videos');
+    console.log('  npm run ingest 5   # Ingest only 5 videos\n');
+    process.exit(1);
+  }
+
+  if (limit) {
+    console.log(`⚠️  Limit: ${limit} videos\n`);
+  }
+
   try {
     // Step 1: Parse watch history
     console.log('Step 1/4: Parsing watch history...\n');
@@ -87,7 +104,7 @@ async function main() {
 
     // Step 2: Fetch video metadata from YouTube API
     console.log('Step 2/4: Fetching video metadata...\n');
-    await analyzeVideos();
+    await analyzeVideos(limit);
 
     // Step 3: Analyze channels
     console.log('\nStep 3/4: Analyzing channels...\n');
@@ -96,7 +113,13 @@ async function main() {
     // Step 4: Download captions
     console.log('\nStep 4/4: Downloading captions...\n');
     const allVideos = await db.select().from(videos);
-    const videoIds = allVideos.map(v => v.id);
+    let videoIds = allVideos.map(v => v.id);
+
+    // Apply limit if specified
+    if (limit && videoIds.length > limit) {
+      videoIds = videoIds.slice(0, limit);
+    }
+
     const results = await downloadAllCaptions(videoIds);
 
     console.log('\n' + '='.repeat(60));

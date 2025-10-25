@@ -61,40 +61,36 @@ npm start
 
 This will:
 1. Apply database migrations (`db:push`)
-2. Parse watch history into database (`parse`)
-3. Run full analysis and generate report (`analyze`)
+2. Ingest metadata (parse history, fetch API data, download captions)
+3. Run AI analysis and generate report
 
 ### Individual Commands
 
-If you prefer to run steps separately:
-
-**Parse Watch History**
+**Ingest Metadata**
 ```bash
-npm run parse
+npm run ingest          # Ingest all videos
+npm run ingest 5        # Ingest only 5 videos (for testing)
 ```
-Extracts video IDs from your watch history, filters out ads and games, and stores them in the SQLite database.
+1. Parses watch history into database (filters ads/games)
+2. Fetches video metadata from YouTube API
+3. Analyzes channel profiles
+4. Downloads English captions/subtitles automatically
 
 **Analyze Content**
 ```bash
-npm run analyze
+npm run analyze         # Analyze all videos with captions
+npm run analyze 3       # Analyze only 3 videos (for testing)
 ```
-1. Fetches video metadata from YouTube API (with smart caching in database)
-2. Analyzes channel profiles and viewing patterns
-3. Classifies content based on your blocklist and age ratings (MPAA, BBFC)
-4. Generates a color-coded terminal report
-5. Exports findings to `data/analysis-results.json`
+1. Runs AI analysis on video transcripts (OpenAI gpt-4o-mini)
+2. Generates content tags (merges YouTube tags + AI tags)
+3. Assesses risk level (HIGH/MEDIUM/LOW) with reasoning
+4. Auto-generates and displays color-coded report
 
 **Download Videos (Optional)**
 ```bash
 npm run download
 ```
-Downloads videos (MP4, lowest quality) to `data/videos/` using yt-dlp for offline AI analysis.
-
-**Download Captions (Optional)**
-```bash
-npm run download-captions
-```
-Downloads English captions/subtitles (SRT format) to `data/captions/` for text analysis.
+Downloads videos (MP4, lowest quality) to `data/videos/` using yt-dlp for offline review.
 
 **Cleanup**
 ```bash
@@ -167,10 +163,9 @@ The terminal report includes:
 ## Workflow
 
 ```bash
-npm run parse              # Parse watch history
-npm run analyze            # Analyze & report
+npm run ingest             # Collect metadata (parse + API + captions)
+npm run analyze            # AI analysis + report
 npm run download           # (Optional) Download videos
-npm run download-captions  # (Optional) Download captions
 npm run cleanup-videos     # Clean up downloads
 ```
 
