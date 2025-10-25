@@ -7,6 +7,8 @@
     "test": "echo \"Error: no test specified\" && exit 1",
     "parse": "node src/cli/parse-video-ids.js",
     "analyze": "node src/cli/analyze.js",
+    "analyze:ai": "node src/cli/analyze-ai.js",
+    "report:tags": "node src/cli/report-tags.js",
     "download": "node src/cli/download-videos.js",
     "download-captions": "node src/cli/download-captions.js",
     "cleanup-videos": "node src/cli/cleanup-videos.js",
@@ -22,7 +24,9 @@
     "dotenv": "^17.2.3",
     "drizzle-orm": "^0.44.7",
     "google-auth-library": "^10.4.2",
-    "googleapis": "^164.1.0"
+    "googleapis": "^164.1.0",
+    "openai": "^6.7.0",
+    "srt-parser-2": "^1.2.3"
   },
   "devDependencies": {
     "drizzle-kit": "^0.31.5"

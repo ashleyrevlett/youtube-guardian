@@ -82,3 +82,28 @@ export const classificationFlags = sqliteTable('classification_flags', {
   message: text('message').notNull(),
   createdAt: integer('created_at', {mode: 'timestamp'}).default(sql`(unixepoch())`),
 });
+
+// Tags table - unique tags across all videos
+export const tags = sqliteTable('tags', {
+  id: integer('id').primaryKey({autoIncrement: true}),
+  name: text('name').notNull().unique(),
+  createdAt: integer('created_at', {mode: 'timestamp'}).default(sql`(unixepoch())`),
+});
+
+// Video-tags junction table (many-to-many)
+export const videoTags = sqliteTable('video_tags', {
+  id: integer('id').primaryKey({autoIncrement: true}),
+  videoId: text('video_id').notNull(),
+  tagId: integer('tag_id').notNull(),
+  createdAt: integer('created_at', {mode: 'timestamp'}).default(sql`(unixepoch())`),
+});
+
+// AI analysis results
+export const aiAnalysis = sqliteTable('ai_analysis', {
+  videoId: text('video_id').primaryKey(),
+  riskLevel: text('risk_level'),        // HIGH, MEDIUM, LOW
+  summary: text('summary'),             // Brief 1-sentence video summary
+  reasoning: text('reasoning'),         // AI's explanation
+  model: text('model'),                 // gpt-4o-mini
+  analyzedAt: integer('analyzed_at', {mode: 'timestamp'}).default(sql`(unixepoch())`),
+});
